@@ -1,8 +1,7 @@
 ## 1. Session Introduction & Goals 🎯
 
-*(This is where you set the tone for your session)*
 
-**Welcome, everyone, to our deep dive into Aztec and Noir!**
+
 
 Today is about embarking on a challenging but incredibly rewarding journey. Our motto here is **"Do Hard Things,"** and the world of Zero-Knowledge proofs and privacy-preserving blockchains is certainly that. But it's also where the most impactful innovations in Web3 are happening.
 
