@@ -1,9 +1,7 @@
-## 1. Session Introduction & Goals 🎯
 
 
 
-
-Today is about embarking on a challenging but incredibly rewarding journey. Our motto here is **"Do Hard Things,"** and the world of Zero-Knowledge proofs and privacy-preserving blockchains is certainly that. But it's also where the most impactful innovations in Web3 are happening.
+***Do Hard Things***
 
 **What is "Programmable Digital Money"?**
 The document you read (referred to as "TL;DR" from here) states:
