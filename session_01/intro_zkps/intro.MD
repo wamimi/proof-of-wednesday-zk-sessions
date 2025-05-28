@@ -199,7 +199,7 @@ Let our solution vector `S` be `[one, x, y, z, out, mult_result]`, where `one` i
 
 ### Arithmetic Circuit Intermediate Representation (ACIR)
 
-**ACIR** is an intermediate representation for arithmetic circuits. Think of it as a standardized language or a common ground between high-level programming languages for ZKPs (like Noir, Circom, Halo2) and the underlying mathematical machinery of different proving systems. (Note: "Halo2- βρίσκεται" seems like a typo from previous content, corrected to Halo2).
+**ACIR** is an intermediate representation for arithmetic circuits. Think of it as a standardized language or a common ground between high-level programming languages for ZKPs (like Noir, Circom, Halo2) and the underlying mathematical machinery of different proving systems. 
 
 **Purpose of ACIR:**
 
