@@ -1,6 +1,6 @@
-# Session 2, Part 2: A Deep Dive into the Counter Contract
+# A Developer's Guide to the Aztec Counter Contract
 
-This document provides a comprehensive breakdown of the Aztec Counter Contract tutorial. The goal is to understand not just *what* the code does, but *why* it's written that way, focusing on the core concepts of private smart contracts in Aztec.
+This document provides a comprehensive breakdown of the Aztec Counter Contract tutorial. The goal is to give you a clear, working example and also to explain the differences between this code and the code currently found in the official Aztec documentation. This will give you a solid foundation for building and for explaining these concepts to others.
 
 ## The Big Picture: What is the Counter Contract?
 
@@ -9,19 +9,58 @@ The Counter Contract is the "Hello, World!" of Aztec. It's a simple program that
 -   **Private**: Only you can see the value of your counter. When you increment it, no one on the network can tell it was you, or what the new value is.
 -   **Own**: Each user (identified by their `AztecAddress`) gets their own independent counter within the same deployed contract.
 
-This tutorial is fundamental because it introduces the most important concept in Aztec: **managing private state**.
+This is a fundamental concept in Aztec because it's a perfect, simple illustration of **managing private state**.
 
-## Project Setup & Dependencies
+## The Tutorial vs. Reality: A Key Learning Moment
 
-First, we set up the project.
+As we discovered, the code in the official Counter Contract tutorial on the Aztec website is slightly out of sync with the library version it specifies (`v0.87.4`). This is a common and important real-world scenario when working with rapidly evolving, cutting-edge technologies.
 
-```bash
-aztec-nargo new --contract counter
+The key issue is that the tutorial's code attempts to use functions and properties (specifically `balance_utils` and `.set`) that the Aztec developers have since made `private`—meaning they are internal to their libraries and no longer available for developers to use directly.
+
+**This guide provides you with code that works correctly with `v0.87.4`.** We will first walk through the working code, and then we will analyze the code from the tutorial to understand exactly why it fails to compile.
+
+## The Correct, Working Code (`src/main.nr`)
+
+This is the complete, minimal, and compilable version of the Counter contract. This is the code you should use for your presentation and development.
+
+```rust
+use dep::aztec::macros::aztec;
+
+#[aztec]
+pub contract Counter {
+    use aztec::macros::{
+        functions::{initializer, private},
+        storage::storage,
+    };
+    use aztec::prelude::{AztecAddress, Map};
+    use easy_private_state::EasyPrivateUint;
+
+    #[storage]
+    struct Storage<Context> {
+        counters: Map<AztecAddress, EasyPrivateUint<Context>, Context>,
+    }
+
+    #[initializer]
+    #[private]
+    fn initialize(headstart: u64, owner: AztecAddress) {
+        let counters = storage.counters;
+        counters.at(owner).add(headstart, owner, context.msg_sender());
+    }
+
+    #[private]
+    fn increment(owner: AztecAddress, sender: AztecAddress) {
+        let counters = storage.counters;
+        counters.at(owner).add(1, owner, sender);
+    }
+}
 ```
 
-This command scaffolds a new Noir contract project. Inside the `counter` directory, we have `Nargo.toml`, our project's configuration file (like `package.json` in Node.js or `Cargo.toml` in Rust).
+## Code Breakdown: The Working Contract
 
-The tutorial asks us to add three dependencies to `Nargo.toml`:
+Let's dissect the working contract piece by piece.
+
+#### **1. Dependencies (`Nargo.toml`)**
+Your project needs to pull in the necessary Aztec libraries.
 
 ```toml
 [dependencies]
@@ -29,72 +68,33 @@ aztec = { git="https://github.com/AztecProtocol/aztec-packages/", tag="v0.87.4",
 value_note = { git="https://github.com/AztecProtocol/aztec-packages/", tag="v0.87.4", directory="noir-projects/aztec-nr/value-note"}
 easy_private_state = { git="https://github.com/AztecProtocol/aztec-packages/", tag="v0.87.4", directory="noir-projects/aztec-nr/easy-private-state"}
 ```
+-   `aztec`: The core library with all the essential macros (`#[aztec]`, `#[private]`) and types.
+-   `value_note`: A low-level library for managing private state as cryptographic "notes."
+-   `easy_private_state`: A high-level abstraction over `value_note`. It gives us `EasyPrivateUint`, which handles all the complex note management (encryption, nullifying, etc.) for us.
 
-Let's break these down:
-*   `aztec`: This is the foundational library for all Aztec smart contracts. It provides the essential macros (`#[aztec]`, `#[private]`, `#[public]`), data types (`AztecAddress`, `Map`), and the execution context (`context`) that every contract needs.
-*   `value_note`: A lower-level library for handling private state. In Aztec, private state isn't just a number stored somewhere; it's a cryptographic "note". This library provides the tools to manage these notes.
-*   `easy_private_state`: This is a high-level abstraction built on top of `value_note`. It's the star of this contract. It gives us the `EasyPrivateUint` type, which lets us treat a private counter as if it were just a simple number (`u64`), while it handles all the complex note creation, encryption, and nullification for us behind the scenes.
-
-## The Code: `src/main.nr` Explained
-
-Now, let's dissect the actual smart contract code, piece by piece.
-
-### The Contract Shell
-
+#### **2. Imports (`use` statements)**
 ```rust
-use dep::aztec::macros::aztec;
-
-#[aztec]
-pub contract Counter {
-    // ... all other code goes here
-}
-```
-
--   `#[aztec]`: This is the most important macro. It transforms this `contract Counter { ... }` definition into a fully-fledged Aztec smart contract, setting up all the necessary boilerplate for it to be compiled and deployed.
-
-### The Imports (`use` statements)
-
-Inside the contract, we start with imports.
-
-```rust
-use aztec::macros::{functions::{initializer, private, public, utility}, storage::storage};
+use aztec::macros::{functions::{initializer, private}, storage::storage};
 use aztec::prelude::{AztecAddress, Map};
-use aztec::protocol_types::traits::{FromField, ToField};
 use easy_private_state::EasyPrivateUint;
-use value_note::{balance_utils, value_note::ValueNote};
 ```
+-   `initializer`, `private`, `storage`: These are macros that declare the purpose of a function or a struct.
+-   `AztecAddress`, `Map`: Core data types for user addresses and key-value storage.
+-   `EasyPrivateUint`: The wrapper that makes private state management simple.
 
--   `initializer`, `private`, `public`, `utility`: These are **function type macros**. They declare the visibility and purpose of a function.
-    -   `#[private]`: The function is executed client-side in the user's PXE. All inputs are kept private. This is for core private logic.
-    -   `#[public]`: The function is executed by the public network (the Sequencer). State changes are public.
-    -   `#[initializer]`: A special function (like a `constructor`) that runs only once when the contract is deployed.
-    -   `#[utility]`: A read-only function that does not create a transaction. It's used to query state from off-chain.
--   `storage`: A macro used to define the contract's state variables.
--   `AztecAddress`, `Map`: Core data types. `AztecAddress` is the unique identifier for a user or contract. `Map` is the key-value store for our state.
--   `EasyPrivateUint`: The powerful wrapper that simplifies private state management.
-
-### The Storage (`struct Storage`)
-
-This is where we define the "shape" of our contract's data.
-
+#### **3. Storage (`struct Storage`)**
+This defines our contract's persistent state variables.
 ```rust
 #[storage]
 struct Storage<Context> {
     counters: Map<AztecAddress, EasyPrivateUint<Context>, Context>,
 }
 ```
+-   We declare one variable: `counters`.
+-   It's a `Map` where the key is a user's `AztecAddress` and the value is their `EasyPrivateUint` private counter.
 
--   `#[storage]`: This macro tells Aztec that this struct defines the contract's persistent state.
--   `counters: Map<...>`: We declare one state variable, `counters`.
--   `Map<AztecAddress, EasyPrivateUint<Context>, Context>`: This is the type. Let's read it from inside out:
-    -   `EasyPrivateUint<Context>`: The *value* of our map is a private unsigned integer.
-    -   `AztecAddress`: The *key* of our map is a user's address.
-    -   So, `counters` is a key-value store that maps each user's address to their own private counter.
-
-### The Constructor (`initialize` function)
-
-This function sets up the contract's initial state upon deployment.
-
+#### **4. The Constructor (`initialize` function)**
+This function runs once on deployment to set the initial state.
 ```rust
 #[initializer]
 #[private]
@@ -103,51 +103,50 @@ fn initialize(headstart: u64, owner: AztecAddress) {
     counters.at(owner).add(headstart, owner, context.msg_sender());
 }
 ```
-
 -   `#[initializer]`: Marks this as the constructor.
--   `#[private]`: The initial state is set privately. No one on the network can see the `headstart` value or the initial `owner`.
--   `fn initialize(headstart: u64, owner: AztecAddress)`: It takes two arguments: an initial value for the counter and the address of the owner.
--   `counters.at(owner)`: We access the `counters` map and specify we're working with the entry for the given `owner`.
--   `.add(headstart, owner, context.msg_sender())`: This is a method provided by `EasyPrivateUint`. It creates a new **private note** containing the `headstart` value and encrypts it so that only the `owner` can read it.
+-   `#[private]`: The initial state is set privately. No one can see the initial `headstart` value or the `owner`.
+-   `counters.at(owner).add(...)`: This is the key method from `EasyPrivateUint`. It creates a new **private note** containing the `headstart` value and encrypts it so that only the `owner` can read it.
 
-### The Core Logic (`increment` function)
-
-This is how a user increases their counter.
-
+#### **5. The Core Logic (`increment` function)**
+This is how a user interacts with their counter after deployment.
 ```rust
 #[private]
 fn increment(owner: AztecAddress, sender: AztecAddress) {
-    // ... debug log ...
     let counters = storage.counters;
     counters.at(owner).add(1, owner, sender);
 }
 ```
--   `#[private]`: This entire operation is private. When this function is called, the network only sees that *a* transaction happened, not who sent it, what function was called, or what the state change was.
--   `counters.at(owner).add(1, owner, sender)`: This is the magic. `EasyPrivateUint` handles the complexity:
+-   `#[private]`: This entire operation is private. The network only sees that *a* transaction occurred, not who sent it, what function was called, or what the state change was.
+-   `counters.at(owner).add(1, ...)`: `EasyPrivateUint` handles all the complexity here:
     1.  It finds the user's existing counter note.
-    2.  It creates a **nullifier** for that old note, effectively "spending" or "voiding" it to prevent it from being used again (this is how Aztec prevents double-spending).
+    2.  It creates a **nullifier** for the old note, effectively "spending" it to prevent double-spends.
     3.  It creates a **new note** with the value incremented by 1.
-    4.  It encrypts the new note for the owner.
+    4.  It encrypts the new note for the `owner`.
 
-### Reading The Value (`get_counter` function)
+---
 
-How do we see our private count? With a utility function.
+## Analysis of the Tutorial's (Non-Working) Code
 
+Now, let's look at the functions from the official tutorial and understand why they were removed from our working example.
+
+#### The `get_counter` function
+
+The tutorial includes this function to read the value of a counter:
 ```rust
+// This code DOES NOT COMPILE
 #[utility]
 unconstrained fn get_counter(owner: AztecAddress) -> Field {
     let counters = storage.counters;
+    // The following line is the source of the error
     balance_utils::get_balance(counters.at(owner).set)
 }
 ```
--   `#[utility]`: This is a read-only "view" function. It doesn't create a transaction or cost gas.
--   `unconstrained`: A technical term meaning it does not add constraints to a ZK proof. This is typical for read-only functions.
--   `balance_utils::get_balance(...)`: This is a helper function that your local PXE uses. It scans its database for all notes related to this contract that belong to you, decrypts them with your private key, and adds them up to show you the final balance. This all happens locally; no private information is ever sent to the network.
+**Why it fails:** This code worked in older versions of the libraries. However, in `v0.87.4`, the developers decided that `balance_utils` and the `.set` property should be internal implementation details of the `easy_private_state` library. They made them `private`, so they can no longer be called directly from another contract. This change enhances encapsulation but breaks the tutorial's code.
 
-### Extra Functions
+**Implication:** With our corrected, working contract, you cannot publicly view a counter's value using a `simulate` call because there is no function to do so. The state is truly private.
 
-The tutorial also includes `increment_self_and_other` and `emit_in_public`. These are to demonstrate more advanced concepts:
--   `increment_self_and_other`: Shows that one private function can call another function (`.call(...)`), demonstrating composability.
--   `emit_in_public`: Shows how a private function can emit a public value (`.enqueue(...)`). This is a way for the private world to send a message to the public world.
+#### Other Functions (`increment_self_and_other`, `emit_in_public`)
 
-This covers the entire contract. You should now have a solid grasp of how it uses private state, manages it with `EasyPrivateUint`, and exposes functions to modify and view it. 
+The tutorial also includes these functions to demonstrate more advanced concepts like cross-contract calls and emitting public events from private functions. They have been omitted from our working example *only for the sake of simplicity*. They are not broken, but they add complexity that distracts from the core goal of understanding basic private state.
+
+This guide gives you a solid, working foundation. You now have a contract that you can compile, deploy, and interact with, and a clear explanation for why it differs from the official documentation. 
