@@ -1,0 +1,21 @@
+{
+  "name": "aa-typescript-interaction",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "yarn clean && tsc -b",
+    "build:dev": "tsc -b --watch",
+    "clean": "rm -rf ./dest tsconfig.tsbuildinfo",
+    "start": "yarn build && node ./dest/index.js"
+  },
+  "dependencies": {
+    "@aztec/aztec.js": "0.87.4",
+    "@aztec/accounts": "0.87.4",
+    "@aztec/noir-contracts.js": "0.87.4",
+    "typescript": "^5.2.2",
+    "@types/node": "^20.8.2"
+  },
+  "devDependencies": {
+    "ts-node": "^10.9.1"
+  }
+} 
